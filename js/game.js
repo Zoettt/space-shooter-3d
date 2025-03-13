@@ -2,7 +2,7 @@ let scene, camera, renderer, player, enemies = [], bullets = [], score = 0;
 // 修改 WebSocket 连接
 // const socket = new WebSocket('ws://localhost:3000');
 // 暂时移除 WebSocket 连接，改为本地分数管理
-let score = 0;
+// 移除重复声明，因为在全局已经声明过 score 变量
 
 // 音效管理
 const audioLoader = new THREE.AudioLoader();
@@ -20,8 +20,8 @@ function init() {
     
     // 设置相机
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 5, 30);  // 调整相机位置
-    camera.lookAt(0, 0, 0);  // 让相机看向场景中心
+    camera.position.set(0, 0, 30);  // 修改相机位置
+    camera.rotation.x = -0.3;       // 修改相机角度
     
     // 添加音频监听器到相机
     camera.add(listener);
@@ -32,6 +32,9 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
+    // 添加错误处理
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
+    
     // 添加光源
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
@@ -191,12 +194,25 @@ function updateScore(points) {
     // 移除 WebSocket 相关代码
 }
 
+// 添加错误处理函数
+function handleContextLost(event) {
+    event.preventDefault();
+    console.error('WebGL context lost. You might need to refresh the page.');
+}
+
+// 修改动画循环函数
 function animate() {
+    if (!renderer || !scene || !camera) return;  // 添加检查
+    
     requestAnimationFrame(animate);
-    updateBullets();
-    updateEnemies();
-    checkCollisions();
-    renderer.render(scene, camera);
+    try {
+        updateBullets();
+        updateEnemies();
+        checkCollisions();
+        renderer.render(scene, camera);
+    } catch (error) {
+        console.error('Render error:', error);
+    }
 }
 
 // 初始化游戏
