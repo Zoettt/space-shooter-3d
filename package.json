@@ -1,0 +1,13 @@
+{
+  "name": "space-shooter-3d",
+  "version": "1.0.0",
+  "description": "3D Space Shooter Game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "ws": "^8.2.3"
+  }
+}
