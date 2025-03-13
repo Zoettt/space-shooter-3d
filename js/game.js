@@ -1,5 +1,8 @@
 let scene, camera, renderer, player, enemies = [], bullets = [], score = 0;
-const socket = new WebSocket('ws://localhost:3000');
+// 修改 WebSocket 连接
+// const socket = new WebSocket('ws://localhost:3000');
+// 暂时移除 WebSocket 连接，改为本地分数管理
+let score = 0;
 
 // 音效管理
 const audioLoader = new THREE.AudioLoader();
@@ -77,9 +80,9 @@ function onWindowResize() {
 }
 
 function loadSounds() {
-    audioLoader.load('sounds/shoot.mp3', buffer => sounds.shoot.setBuffer(buffer));
-    audioLoader.load('sounds/explosion.mp3', buffer => sounds.explosion.setBuffer(buffer));
-    audioLoader.load('sounds/background.mp3', buffer => {
+    audioLoader.load('./sounds/shoot.mp3', buffer => sounds.shoot.setBuffer(buffer));
+    audioLoader.load('./sounds/explosion.mp3', buffer => sounds.explosion.setBuffer(buffer));
+    audioLoader.load('./sounds/background.mp3', buffer => {
         sounds.background.setBuffer(buffer);
         sounds.background.setLoop(true);
         sounds.background.play();
@@ -107,10 +110,7 @@ function movePlayer(direction) {
     } else if (direction === 'right' && player.position.x < 10) {
         player.position.x += speed;
     }
-    socket.send(JSON.stringify({
-        type: 'move',
-        position: player.position
-    }));
+    // 移除 WebSocket 相关代码
 }
 
 function shoot() {
@@ -118,10 +118,7 @@ function shoot() {
     bullets.push(bullet);
     scene.add(bullet);
     sounds.shoot.play();
-    socket.send(JSON.stringify({
-        type: 'shoot',
-        position: bullet.position
-    }));
+    // 移除 WebSocket 相关代码
 }
 
 function createBullet() {
@@ -191,11 +188,7 @@ function checkCollisions() {
 function updateScore(points) {
     score += points;
     document.getElementById('score').textContent = `得分: ${score}`;
-    // 发送分数到服务器
-    socket.send(JSON.stringify({
-        type: 'score',
-        score: score
-    }));
+    // 移除 WebSocket 相关代码
 }
 
 function animate() {
