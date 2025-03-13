@@ -1,168 +1,226 @@
-let scene, camera, renderer, player, enemies = [], bullets = [], score = 0;
-// 修改 WebSocket 连接
-// const socket = new WebSocket('ws://localhost:3000');
-// 暂时移除 WebSocket 连接，改为本地分数管理
-// 移除重复声明，因为在全局已经声明过 score 变量
+// 游戏核心变量
+let scene, camera, renderer;
+let player1, player2;
+let bullets1 = [], bullets2 = [], enemies = [];
+let score1 = 0, score2 = 0;
 
-// 音效管理
-const audioLoader = new THREE.AudioLoader();
-const listener = new THREE.AudioListener();
-const sounds = {
-    shoot: new THREE.Audio(listener),
-    explosion: new THREE.Audio(listener),
-    background: new THREE.Audio(listener)
-};
+// 键盘状态 - 使用简单变量
+let leftKey = false;
+let rightKey = false;
+let spaceKey = false;
+let aKey = false;
+let dKey = false;
+let wKey = false;
 
+// 初始化游戏
 function init() {
-    // 初始化场景
+    console.log("游戏初始化开始");
+    
+    // 创建场景
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000000);
     
-    // 设置相机
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 30);  // 修改相机位置
-    camera.rotation.x = -0.3;       // 修改相机角度
+    // 创建相机
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 20);
     
-    // 添加音频监听器到相机
-    camera.add(listener);
-    
-    // 设置渲染器
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    // 创建渲染器
+    renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
-
-    // 添加错误处理
-    renderer.domElement.addEventListener('webglcontextlost', handleContextLost, false);
     
     // 添加光源
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(0, 1, 1);
-    scene.add(directionalLight);
-
-    // 加载音效
-    loadSounds();
+    const light = new THREE.AmbientLight(0xffffff);
+    scene.add(light);
     
     // 创建玩家
-    createPlayer();
+    createPlayers();
     
-    // 启用阴影
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // 设置键盘监听
+    setupKeyboardListeners();
     
-    // 添加事件监听
-    document.addEventListener('keydown', onKeyDown);
-    window.addEventListener('resize', onWindowResize, false);
+    console.log("游戏初始化完成");
     
-    // 开始动画循环
-    animate();
+    // 开始游戏循环
+    gameLoop();
 }
 
-function createPlayer() {
-    const geometry = new THREE.BoxGeometry(2, 1, 1);
-    const material = new THREE.MeshPhongMaterial({ 
-        color: 0x0000ff,
-        specular: 0x555555,
-        shininess: 30 
+// 创建玩家
+function createPlayers() {
+    // 玩家1（蓝色）
+    const geometry1 = new THREE.BoxGeometry(2, 1, 1);
+    const material1 = new THREE.MeshBasicMaterial({color: 0x0000ff});
+    player1 = new THREE.Mesh(geometry1, material1);
+    player1.position.set(-5, -10, 0);
+    scene.add(player1);
+    
+    // 玩家2（绿色）
+    const geometry2 = new THREE.BoxGeometry(2, 1, 1);
+    const material2 = new THREE.MeshBasicMaterial({color: 0x00ff00});
+    player2 = new THREE.Mesh(geometry2, material2);
+    player2.position.set(5, -10, 0);
+    scene.add(player2);
+    
+    console.log("玩家创建完成");
+}
+
+// 设置键盘监听
+function setupKeyboardListeners() {
+    // 按键按下
+    window.addEventListener('keydown', function(e) {
+        console.log("按键按下:", e.code);
+        switch(e.code) {
+            case 'ArrowLeft': leftKey = true; break;
+            case 'ArrowRight': rightKey = true; break;
+            case 'Space': spaceKey = true; break;
+            case 'KeyA': aKey = true; break;
+            case 'KeyD': dKey = true; break;
+            case 'KeyW': wKey = true; break;
+        }
     });
-    player = new THREE.Mesh(geometry, material);
-    player.position.set(0, -8, 0);
-    player.castShadow = true;
-    player.receiveShadow = true;
-    scene.add(player);
-}
-
-// 添加窗口大小调整处理
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function loadSounds() {
-    audioLoader.load('./sounds/shoot.mp3', buffer => sounds.shoot.setBuffer(buffer));
-    audioLoader.load('./sounds/explosion.mp3', buffer => sounds.explosion.setBuffer(buffer));
-    audioLoader.load('./sounds/background.mp3', buffer => {
-        sounds.background.setBuffer(buffer);
-        sounds.background.setLoop(true);
-        sounds.background.play();
+    
+    // 按键释放
+    window.addEventListener('keyup', function(e) {
+        switch(e.code) {
+            case 'ArrowLeft': leftKey = false; break;
+            case 'ArrowRight': rightKey = false; break;
+            case 'Space': spaceKey = false; break;
+            case 'KeyA': aKey = false; break;
+            case 'KeyD': dKey = false; break;
+            case 'KeyW': wKey = false; break;
+        }
     });
+    
+    console.log("键盘监听设置完成");
 }
 
-function onKeyDown(event) {
-    switch(event.keyCode) {
-        case 37: // 左箭头
-            movePlayer('left');
-            break;
-        case 39: // 右箭头
-            movePlayer('right');
-            break;
-        case 32: // 空格
-            shoot();
-            break;
+// 游戏主循环
+function gameLoop() {
+    requestAnimationFrame(gameLoop);
+    
+    // 处理玩家移动
+    updatePlayers();
+    
+    // 处理射击
+    handleShooting();
+    
+    // 更新游戏状态
+    updateBullets();
+    updateEnemies();
+    checkCollisions();
+    
+    // 渲染场景
+    renderer.render(scene, camera);
+}
+
+// 更新玩家位置
+function updatePlayers() {
+    const speed = 1.5;
+    
+    // 玩家1移动
+    if (leftKey && player1.position.x > -10) {
+        player1.position.x -= speed;
+    }
+    if (rightKey && player1.position.x < 10) {
+        player1.position.x += speed;
+    }
+    
+    // 玩家2移动
+    if (aKey && player2.position.x > -10) {
+        player2.position.x -= speed;
+    }
+    if (dKey && player2.position.x < 10) {
+        player2.position.x += speed;
     }
 }
 
-function movePlayer(direction) {
-    const speed = 0.3;
-    if (direction === 'left' && player.position.x > -10) {
-        player.position.x -= speed;
-    } else if (direction === 'right' && player.position.x < 10) {
-        player.position.x += speed;
+// 射击冷却
+let player1Cooldown = 0;
+let player2Cooldown = 0;
+
+// 处理射击
+function handleShooting() {
+    // 更新冷却
+    if (player1Cooldown > 0) player1Cooldown--;
+    if (player2Cooldown > 0) player2Cooldown--;
+    
+    // 玩家1射击
+    if (spaceKey && player1Cooldown === 0) {
+        createBullet(player1, 1);
+        player1Cooldown = 10;
     }
-    // 移除 WebSocket 相关代码
+    
+    // 玩家2射击
+    if (wKey && player2Cooldown === 0) {
+        createBullet(player2, 2);
+        player2Cooldown = 10;
+    }
 }
 
-function shoot() {
-    const bullet = createBullet();
-    bullets.push(bullet);
-    scene.add(bullet);
-    sounds.shoot.play();
-    // 移除 WebSocket 相关代码
-}
-
-function createBullet() {
-    const geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-    const material = new THREE.MeshPhongMaterial({ color: 0xffff00 });
-    const bullet = new THREE.Mesh(geometry, material);
+// 创建子弹
+function createBullet(player, playerNum) {
+    const bulletGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    const bulletMaterial = new THREE.MeshBasicMaterial({color: 0xffff00});
+    const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+    
     bullet.position.copy(player.position);
     bullet.position.y += 1;
-    return bullet;
+    scene.add(bullet);
+    
+    if (playerNum === 1) {
+        bullets1.push(bullet);
+    } else {
+        bullets2.push(bullet);
+    }
 }
 
+// 更新子弹位置
 function updateBullets() {
-    for (let i = bullets.length - 1; i >= 0; i--) {
-        bullets[i].position.y += 0.5;
-        if (bullets[i].position.y > 30) {
-            scene.remove(bullets[i]);
-            bullets.splice(i, 1);
+    // 更新玩家1子弹
+    for (let i = bullets1.length - 1; i >= 0; i--) {
+        bullets1[i].position.y += 0.5;
+        if (bullets1[i].position.y > 15) {
+            scene.remove(bullets1[i]);
+            bullets1.splice(i, 1);
+        }
+    }
+    
+    // 更新玩家2子弹
+    for (let i = bullets2.length - 1; i >= 0; i--) {
+        bullets2[i].position.y += 0.5;
+        if (bullets2[i].position.y > 15) {
+            scene.remove(bullets2[i]);
+            bullets2.splice(i, 1);
         }
     }
 }
 
+// 创建敌人
 function createEnemy() {
-    const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-    const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-    const enemy = new THREE.Mesh(geometry, material);
+    const enemyGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const enemyMaterial = new THREE.MeshBasicMaterial({color: 0xff0000});
+    const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+    
     enemy.position.set(
         Math.random() * 20 - 10,
-        20,
+        15,
         0
     );
-    enemies.push(enemy);
+    
     scene.add(enemy);
+    enemies.push(enemy);
 }
 
+// 更新敌人位置
 function updateEnemies() {
+    // 随机生成敌人
     if (Math.random() < 0.02) {
         createEnemy();
     }
-
+    
+    // 更新敌人位置
     for (let i = enemies.length - 1; i >= 0; i--) {
-        enemies[i].position.y -= 0.2;
+        enemies[i].position.y -= 0.1;
         if (enemies[i].position.y < -15) {
             scene.remove(enemies[i]);
             enemies.splice(i, 1);
@@ -170,50 +228,56 @@ function updateEnemies() {
     }
 }
 
+// 检测碰撞
 function checkCollisions() {
+    // 检测玩家1子弹碰撞
     for (let i = enemies.length - 1; i >= 0; i--) {
-        for (let j = bullets.length - 1; j >= 0; j--) {
-            if (enemies[i] && bullets[j]) {
-                const distance = enemies[i].position.distanceTo(bullets[j].position);
-                if (distance < 1) {
-                    scene.remove(enemies[i]);
-                    scene.remove(bullets[j]);
-                    enemies.splice(i, 1);
-                    bullets.splice(j, 1);
-                    updateScore(10);
-                    sounds.explosion.play();
-                }
+        for (let j = bullets1.length - 1; j >= 0; j--) {
+            if (isColliding(enemies[i], bullets1[j])) {
+                updateScore(1);
+                scene.remove(enemies[i]);
+                scene.remove(bullets1[j]);
+                enemies.splice(i, 1);
+                bullets1.splice(j, 1);
+                break;
+            }
+        }
+    }
+    
+    // 检测玩家2子弹碰撞
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        for (let j = bullets2.length - 1; j >= 0; j--) {
+            if (isColliding(enemies[i], bullets2[j])) {
+                updateScore(2);
+                scene.remove(enemies[i]);
+                scene.remove(bullets2[j]);
+                enemies.splice(i, 1);
+                bullets2.splice(j, 1);
+                break;
             }
         }
     }
 }
 
-function updateScore(points) {
-    score += points;
-    document.getElementById('score').textContent = `得分: ${score}`;
-    // 移除 WebSocket 相关代码
+// 碰撞检测
+function isColliding(obj1, obj2) {
+    const distance = Math.sqrt(
+        Math.pow(obj1.position.x - obj2.position.x, 2) +
+        Math.pow(obj1.position.y - obj2.position.y, 2)
+    );
+    return distance < 1;
 }
 
-// 添加错误处理函数
-function handleContextLost(event) {
-    event.preventDefault();
-    console.error('WebGL context lost. You might need to refresh the page.');
-}
-
-// 修改动画循环函数
-function animate() {
-    if (!renderer || !scene || !camera) return;  // 添加检查
-    
-    requestAnimationFrame(animate);
-    try {
-        updateBullets();
-        updateEnemies();
-        checkCollisions();
-        renderer.render(scene, camera);
-    } catch (error) {
-        console.error('Render error:', error);
+// 更新分数
+function updateScore(playerNum) {
+    if (playerNum === 1) {
+        score1 += 10;
+        document.getElementById('score1').textContent = `玩家1得分: ${score1}`;
+    } else {
+        score2 += 10;
+        document.getElementById('score2').textContent = `玩家2得分: ${score2}`;
     }
 }
 
-// 初始化游戏
-init();
+// 启动游戏
+window.addEventListener('load', init);
